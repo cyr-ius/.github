@@ -53,7 +53,7 @@ sed_escape() {
 render() {
   local src=$1 dest=$2
   mkdir -p "$(dirname "$dest")"
-  sed -e "s/{{NAME}}/$NAME/g" -e "s/{{DOMAIN}}/$DOMAIN/g" "$src" >"$dest"
+  sed -e "s/{{NAME}}/$NAME/g" -e "s/{{DOMAIN}}/$DOMAIN/g" -e "s/{{BRANCH}}/$BRANCH/g" "$src" >"$dest"
 }
 
 write_dependabot() {
@@ -81,6 +81,8 @@ sync_repo() {
   fi
   DOMAIN=$(sed_escape "$(basename "$(dirname "${manifests[0]}")")")
   NAME=$(sed_escape "$(jq -r '.name' "${manifests[0]}")")
+  BRANCH=$(git -C "$repo" symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null || echo origin/main)
+  BRANCH=$(sed_escape "${BRANCH#origin/}")
 
   local gh=$repo/.github
   mkdir -p "$gh/workflows"
@@ -108,7 +110,7 @@ sync_repo() {
     render "$TEMPLATES/PULL_REQUEST_TEMPLATE.md" "$gh/PULL_REQUEST_TEMPLATE.md"
   fi
 
-  echo "synced $repo (domain: $DOMAIN)"
+  echo "synced $repo (domain: $DOMAIN, branch: $BRANCH)"
 }
 
 for repo in "${repos[@]}"; do
