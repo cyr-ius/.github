@@ -1,0 +1,55 @@
+---
+name: Python build
+
+# Builds the sdist and wheel and uploads them as the "dist" artifact.
+# Publishing must stay in the caller: PyPI trusted publishing does not
+# support reusable workflows (pypi/warehouse#11096).
+on:
+  workflow_call:
+    inputs:
+      python-version:
+        description: Python version used to build the package.
+        type: string
+        default: "3.14"
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 📥 Checkout the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          python-version: ${{ inputs.python-version }}
+
+      - name: Build package
+        run: uv build
+
+      - name: Check tag matches package version
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          shopt -s nullglob
+          wheels=(dist/*.whl)
+          version=$(basename "${wheels[0]}" | cut -d- -f2)
+          # Compare normalized versions: tag 1.0.0-beta1 builds 1.0.0b1.
+          if ! uv run --no-project --with packaging python -c \
+            'import sys; from packaging.version import Version as V; sys.exit(V(sys.argv[1]) != V(sys.argv[2]))' \
+            "$version" "$GITHUB_REF_NAME"; then
+            echo "::error::package version ($version) does not match tag ($GITHUB_REF_NAME)"
+            exit 1
+          fi
+
+      - name: Upload distributions
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: dist
+          path: dist/
+          if-no-files-found: error
