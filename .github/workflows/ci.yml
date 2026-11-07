@@ -26,8 +26,7 @@ jobs:
           for family in ha py; do
             mkdir -p "$RUNNER_TEMP/templates/$family"
             for f in "$family"/templates/workflows/*.yml; do
-              sed -e 's/{{BRANCH}}/main/g' -e 's/{{DOMAIN}}/example/g' \
-                -e 's/{{PYTHONS}}/["3.14"]/g' "$f" \
+              sed -e 's/{{BRANCH}}/main/g' -e 's/{{DOMAIN}}/example/g' "$f" \
                 >"$RUNNER_TEMP/templates/$family/$(basename "$f")"
             done
           done

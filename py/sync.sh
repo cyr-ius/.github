@@ -6,11 +6,10 @@
 #   --prune  remove the legacy workflow files replaced by the templates
 #
 # Workflows and dependabot.yml are always (re)written. Tests run on the
-# minimum Python of `requires-python` and on the latest supported one.
+# Python versions set by default in py-tests.yml.
 set -euo pipefail
 
 TEMPLATES="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/templates"
-LATEST_PYTHON=3.14
 
 # Workflow files from the previous per-repository CI, replaced by the templates.
 LEGACY_WORKFLOWS=(
@@ -42,23 +41,9 @@ done
 render() {
   local src=$1 dest=$2
   mkdir -p "$(dirname "$dest")"
-  sed -e "s/{{BRANCH}}/$BRANCH/g" -e "s/{{PYTHONS}}/$PYTHONS/g" "$src" >"$dest"
+  sed -e "s/{{BRANCH}}/$BRANCH/g" "$src" >"$dest"
 }
 
-# JSON list of the minimum Python from requires-python and LATEST_PYTHON.
-python_versions() {
-  python3 - "$1/pyproject.toml" "$LATEST_PYTHON" <<'EOF'
-import json, re, sys, tomllib
-
-spec = tomllib.load(open(sys.argv[1], "rb")).get("project", {}).get("requires-python", "")
-latest = sys.argv[2]
-match = re.search(r">=\s*(\d+)\.(\d+)", spec)
-versions = [f"{match[1]}.{match[2]}"] if match else []
-if latest not in versions:
-    versions.append(latest)
-print(json.dumps(versions, separators=(",", ":")))
-EOF
-}
 
 write_dependabot() {
   local repo=$1 eco
@@ -83,7 +68,6 @@ sync_repo() {
   fi
   BRANCH=$(git -C "$repo" symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null || echo origin/main)
   BRANCH=${BRANCH#origin/}
-  PYTHONS=$(python_versions "$repo")
 
   local gh=$repo/.github
   mkdir -p "$gh/workflows"
@@ -101,7 +85,7 @@ sync_repo() {
 
   write_dependabot "$repo"
 
-  echo "synced $repo (branch: $BRANCH, python: $PYTHONS)"
+  echo "synced $repo (branch: $BRANCH)"
 }
 
 for repo in "${repos[@]}"; do
