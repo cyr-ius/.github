@@ -1,0 +1,59 @@
+---
+name: HA release
+
+# The caller must grant `contents: write` to the job using this workflow.
+on:
+  workflow_call:
+    inputs:
+      domain:
+        description: Integration domain (custom_components/<domain>). Auto-detected when empty.
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: 📥 Checkout the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Check manifest version matches tag
+        env:
+          DOMAIN: ${{ inputs.domain }}
+        run: |
+          if [[ -z "$DOMAIN" ]]; then
+            mapfile -t domains < <(find custom_components -mindepth 1 -maxdepth 1 -type d ! -name __pycache__ -printf '%f\n')
+            if (( ${#domains[@]} != 1 )); then
+              echo "::error::cannot auto-detect the domain (found: ${domains[*]:-none}), set the 'domain' input"
+              exit 1
+            fi
+            DOMAIN=${domains[0]}
+          fi
+          manifest="custom_components/$DOMAIN/manifest.json"
+          manifest_version=$(jq -r '.version' "$manifest")
+          if [[ "$manifest_version" != "$GITHUB_REF_NAME" ]]; then
+            echo "::error file=$manifest::manifest version ($manifest_version) does not match tag ($GITHUB_REF_NAME)"
+            exit 1
+          fi
+
+      - name: Create Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          prerelease=()
+          if [[ "$GITHUB_REF_NAME" == *-* ]]; then
+            prerelease=(--prerelease)
+          fi
+          gh release create "$GITHUB_REF_NAME" \
+            --repo "$GITHUB_REPOSITORY" \
+            --verify-tag \
+            --title "$GITHUB_REF_NAME" \
+            --generate-notes \
+            "${prerelease[@]}"

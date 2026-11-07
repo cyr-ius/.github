@@ -1,0 +1,40 @@
+---
+name: HA validate
+
+on:
+  workflow_call:
+    inputs:
+      hacs-category:
+        description: HACS category of the repository.
+        type: string
+        default: integration
+
+permissions:
+  contents: read
+
+jobs:
+  hacs:
+    name: HACS Action
+    runs-on: ubuntu-latest
+    steps:
+      - name: 📥 Checkout the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: HACS Action
+        uses: hacs/action@1ebf01c408f29afcb6406bd431bc98fd8cbb15aa # main
+        with:
+          category: ${{ inputs.hacs-category }}
+
+  hassfest:
+    name: Hassfest
+    runs-on: ubuntu-latest
+    steps:
+      - name: 📥 Checkout the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Hassfest
+        uses: home-assistant/actions/hassfest@86d4564712fa02543c808e3a693dd04f9d3f8361 # master

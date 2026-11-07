@@ -1,0 +1,42 @@
+---
+name: Dependabot auto-merge
+
+# The caller must grant `contents: write` and `pull-requests: write`.
+on:
+  workflow_call:
+    inputs:
+      update-types:
+        description: Comma-separated Dependabot update types merged automatically.
+        type: string
+        default: version-update:semver-patch,version-update:semver-minor
+      merge-method:
+        description: gh pr merge method (merge, squash or rebase).
+        type: string
+        default: merge
+
+permissions:
+  contents: read
+
+jobs:
+  dependabot:
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.user.login == 'dependabot[bot]' && github.repository_owner == 'cyr-ius'
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Fetch Dependabot metadata
+        id: metadata
+        uses: dependabot/fetch-metadata@21025c705c08248db411dc16f3619e6b5f9ea21a # v2.5.0
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Approve and enable auto-merge
+        if: contains(format(',{0},', inputs.update-types), format(',{0},', steps.metadata.outputs.update-type))
+        run: |
+          gh pr review --approve "$PR_URL"
+          gh pr merge --auto "--$MERGE_METHOD" "$PR_URL"
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          MERGE_METHOD: ${{ inputs.merge-method }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
