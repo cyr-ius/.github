@@ -1,12 +1,16 @@
 ---
 name: GitHub release
 
+# Publish the GitHub release of the tag that triggered the caller. Release
+# Please creates a draft release with its changelog: publish it. A tag pushed
+# by hand has no release yet: create it with generated notes. A tag carrying a
+# semver pre-release suffix (X.Y.Z-rc.1) is marked as a pre-release.
+#
 # The caller must grant `contents: write` to the job using this workflow.
 on:
   workflow_call:
 
-permissions:
-  contents: read
+permissions: {}
 
 jobs:
   release:
@@ -14,17 +18,22 @@ jobs:
     permissions:
       contents: write
     steps:
-      - name: Create Release
+      - name: Publish release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          prerelease=()
+          prerelease=false
           if [[ "$GITHUB_REF_NAME" == *-* ]]; then
-            prerelease=(--prerelease)
+            prerelease=true
           fi
-          gh release create "$GITHUB_REF_NAME" \
-            --repo "$GITHUB_REPOSITORY" \
-            --verify-tag \
-            --title "$GITHUB_REF_NAME" \
-            --generate-notes \
-            "${prerelease[@]}"
+          if gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+            gh release edit "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" \
+              --draft=false --prerelease="$prerelease"
+          else
+            gh release create "$GITHUB_REF_NAME" \
+              --repo "$GITHUB_REPOSITORY" \
+              --verify-tag \
+              --title "$GITHUB_REF_NAME" \
+              --generate-notes \
+              --prerelease="$prerelease"
+          fi

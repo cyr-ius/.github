@@ -1,0 +1,79 @@
+---
+name: Release Please
+
+# Run Release Please on the release branch (the branch that triggered the
+# caller). When a release is created: dispatch the caller's publish workflow on
+# the new tag and merge the release branch back into the development branch.
+#
+# The caller must grant `contents: write`, `pull-requests: write` and
+# `actions: write`; each job below only gets what it needs.
+on:
+  workflow_call:
+    inputs:
+      publish-workflow:
+        description: Workflow file dispatched on the new tag ("" disables it).
+        type: string
+        default: publish.yml
+      publish-args:
+        description: Extra `gh workflow run` arguments (e.g. -f target=pypi).
+        type: string
+        default: ""
+      dev-branch:
+        description: Branch receiving the release commit ("" disables it).
+        type: string
+        default: dev
+
+permissions: {}
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    outputs:
+      release_created: ${{ steps.release.outputs.release_created }}
+      tag_name: ${{ steps.release.outputs.tag_name }}
+    steps:
+      - uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
+        id: release
+
+  # A tag pushed with the workflow token triggers no workflow: dispatch it. A job of its own,
+  # so that the third-party action above never gets actions: write
+  publish:
+    needs: release-please
+    if: needs.release-please.outputs.release_created == 'true' && inputs.publish-workflow != ''
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+    steps:
+      # Run on the tag, so that the workflow sees refs/tags/<tag> as for a tag pushed by hand
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.release-please.outputs.tag_name }}
+          WORKFLOW: ${{ inputs.publish-workflow }}
+          ARGS: ${{ inputs.publish-args }}
+        # ARGS is split into words on purpose
+        run: gh workflow run "$WORKFLOW" --repo "$GITHUB_REPOSITORY" --ref "$TAG" $ARGS
+
+  # Bring the release commit (CHANGELOG.md, versions) back to the development branch
+  sync-dev:
+    needs: release-please
+    if: needs.release-please.outputs.release_created == 'true' && inputs.dev-branch != ''
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.dev-branch }}
+          fetch-depth: 0
+      - name: Merge the release branch into ${{ inputs.dev-branch }}
+        env:
+          DEV_BRANCH: ${{ inputs.dev-branch }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git merge "origin/$GITHUB_REF_NAME" --no-edit
+          git push origin "$DEV_BRANCH"

@@ -23,10 +23,14 @@ jobs:
 
       - name: Render the templates
         run: |
-          for family in ha py; do
+          for family in ha py web; do
             mkdir -p "$RUNNER_TEMP/templates/$family"
-            for f in "$family"/templates/workflows/*.yml; do
-              sed -e 's/{{BRANCH}}/main/g' -e 's/{{DOMAIN}}/example/g' "$f" \
+            for f in "$family"/templates/workflows/*.yml "$family"/templates/once/*.yml; do
+              [ -f "$f" ] || continue
+              sed -e 's/{{BRANCH}}/main/g' -e 's/{{DOMAIN}}/example/g' \
+                -e 's/{{IMAGE}}/example/g' -e 's/{{TITLE}}/Example/g' -e 's/{{DESCRIPTION}}/Example/g' \
+                -e 's/{{PORT}}/8000/g' -e 's/{{BACKEND_DIR}}/backend/g' \
+                -e 's/{{VERSION_FILES}}/backend\/pyproject.toml frontend\/package.json/g' "$f" \
                 >"$RUNNER_TEMP/templates/$family/$(basename "$f")"
             done
           done
@@ -35,4 +39,4 @@ jobs:
         run: uvx --from actionlint-py actionlint .github/workflows/*.yml "$RUNNER_TEMP"/templates/*/*.yml
 
       - name: Check sync scripts
-        run: bash -n ha/sync.sh py/sync.sh
+        run: bash -n ha/sync.sh py/sync.sh web/sync.sh

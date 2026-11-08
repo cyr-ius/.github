@@ -1,0 +1,224 @@
+---
+name: Web Docker image
+
+# Build and smoke-test the image of the repository root Dockerfile; with
+# `push`, publish it to GitHub Container Registry and Docker Hub.
+#
+# The caller must grant `contents: read` and `packages: write`, and pass the
+# `dockerhub-token` secret (access token with read/write scope on the Docker
+# Hub repository) when `push` is true.
+on:
+  workflow_call:
+    inputs:
+      image:
+        description: Image name, without registry or namespace (e.g. powerdns-ui).
+        type: string
+        required: true
+      title:
+        description: org.opencontainers.image.title of the image.
+        type: string
+        required: true
+      description:
+        description: org.opencontainers.image.description of the image.
+        type: string
+        required: true
+      documentation:
+        description: org.opencontainers.image.documentation URL ("" for the repository README).
+        type: string
+        default: ""
+      platforms:
+        description: Platforms of the published image.
+        type: string
+        default: linux/amd64
+      push:
+        description: Publish the image.
+        type: boolean
+        default: false
+      dockerhub-namespace:
+        description: Docker Hub namespace.
+        type: string
+        default: cyrius44
+      dockerhub-readme:
+        description: Copy README.md to the Docker Hub repository description when publishing.
+        type: boolean
+        default: false
+      smoke-port:
+        description: Container port answering the smoke test (0 skips the smoke test).
+        type: number
+        default: 8000
+      smoke-path:
+        description: HTTP path that must answer 2xx in the smoke test.
+        type: string
+        default: /api/health
+      smoke-args:
+        description: Extra `docker run` arguments of the smoke test (e.g. -e KEY=value).
+        type: string
+        default: ""
+    secrets:
+      dockerhub-token:
+        description: Docker Hub access token, required when push is true.
+        required: false
+
+permissions: {}
+
+env:
+  # Annotations on the multi-platform index too, so that registries show the description
+  DOCKER_METADATA_ANNOTATIONS_LEVELS: manifest,index
+
+jobs:
+  image:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      # Loaded into the local daemon to check that the application starts
+      - name: Build for the smoke test
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          platforms: linux/amd64
+          load: true
+          tags: smoke-test:latest
+          build-args: |
+            VERSION=smoke-test
+          cache-from: type=gha,scope=image
+          cache-to: type=gha,mode=max,scope=image
+
+      - name: Smoke test
+        if: inputs.smoke-port != 0
+        env:
+          PORT: ${{ inputs.smoke-port }}
+          HEALTH_PATH: ${{ inputs.smoke-path }}
+          SMOKE_ARGS: ${{ inputs.smoke-args }}
+        # SMOKE_ARGS is split into words on purpose
+        run: |
+          docker run -d --name smoke-test -p "$PORT:$PORT" $SMOKE_ARGS smoke-test:latest
+          for _ in $(seq 1 30); do
+            if curl -fsS "http://localhost:$PORT$HEALTH_PATH"; then
+              docker rm -f smoke-test > /dev/null
+              exit 0
+            fi
+            sleep 2
+          done
+          docker logs smoke-test
+          docker rm -f smoke-test > /dev/null
+          exit 1
+
+  push:
+    needs: image
+    if: inputs.push
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # Registry names must be lowercase
+      - name: Image names
+        id: names
+        env:
+          IMAGE: ${{ inputs.image }}
+          NAMESPACE: ${{ inputs.dockerhub-namespace }}
+          DOCUMENTATION: ${{ inputs.documentation }}
+        run: |
+          {
+            echo "images<<EOF"
+            echo "ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/${IMAGE,,}"
+            echo "docker.io/${NAMESPACE,,}/${IMAGE,,}"
+            echo "EOF"
+            echo "documentation=${DOCUMENTATION:-$GITHUB_SERVER_URL/$GITHUB_REPOSITORY#readme}"
+          } >> "$GITHUB_OUTPUT"
+
+      - uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
+        id: meta
+        with:
+          images: ${{ steps.names.outputs.images }}
+          # X.Y.Z -> X.Y.Z, X.Y, X and latest; a pre-release (X.Y.Z-rc.1) only gets its version
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+            type=ref,event=branch
+            type=ref,event=pr
+          flavor: |
+            latest=auto
+          labels: |
+            org.opencontainers.image.title=${{ inputs.title }}
+            org.opencontainers.image.description=${{ inputs.description }}
+            org.opencontainers.image.vendor=${{ github.repository_owner }}
+            org.opencontainers.image.documentation=${{ steps.names.outputs.documentation }}
+          annotations: |
+            org.opencontainers.image.title=${{ inputs.title }}
+            org.opencontainers.image.description=${{ inputs.description }}
+
+      - uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Check the Docker Hub token
+        env:
+          DOCKERHUB_TOKEN: ${{ secrets.dockerhub-token }}
+        run: |
+          if [ -z "$DOCKERHUB_TOKEN" ]; then
+            echo "::error::Secret dockerhub-token is missing (pass the DOCKERHUB_TOKEN repository secret)"
+            exit 1
+          fi
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
+        with:
+          username: ${{ inputs.dockerhub-namespace }}
+          password: ${{ secrets.dockerhub-token }}
+
+      # Reuses the cache of the smoke-test build; SBOM and provenance attached
+      - name: Build and push
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          platforms: ${{ inputs.platforms }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          annotations: ${{ steps.meta.outputs.annotations }}
+          build-args: |
+            VERSION=${{ steps.meta.outputs.version }}
+          provenance: mode=max
+          sbom: true
+          cache-from: type=gha,scope=image
+          cache-to: type=gha,mode=max,scope=image
+
+      - name: Update the Docker Hub description
+        if: inputs.dockerhub-readme
+        uses: peter-evans/dockerhub-description@1b9a80c056b620d92cedb9d9b5a223409c68ddfa # v5.0.0
+        with:
+          username: ${{ inputs.dockerhub-namespace }}
+          password: ${{ secrets.dockerhub-token }}
+          repository: ${{ inputs.dockerhub-namespace }}/${{ inputs.image }}
+          short-description: ${{ inputs.description }}
+          readme-filepath: ./README.md
+
+      - name: Write job summary
+        env:
+          TAGS: ${{ steps.meta.outputs.tags }}
+        run: |
+          {
+            echo "## Docker image published"
+            echo '```'
+            echo "$TAGS"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

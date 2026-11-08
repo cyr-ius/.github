@@ -11,6 +11,14 @@ Shared GitHub configuration for cyr-ius repositories.
   Workflows prefixed `py-`; `gh-release.yml`, `dependabot-automerge.yml` and
   `stale.yml` are shared by every family.
 
+- `web/`: web application (uv backend + Node frontend + Docker image) templates
+  and `web/sync.sh [--prune] <repo>...`. Workflows prefixed `web-`. Release
+  model: development on `dev`, Release Please on the default branch, which
+  dispatches the repository's `publish.yml` (CI, tag/version check, Docker
+  image on GHCR and Docker Hub, GitHub release) and merges the release back
+  into `dev`. `web/templates/workflows/` are rewritten on every sync;
+  `web/templates/once/` are project specific and only written when missing.
+
 PyPI trusted publishing does not support reusable workflows, so the publish
 job stays in each library's `python-publish.yml` (environment `release`);
 `py-build.yml` builds the distributions it publishes.

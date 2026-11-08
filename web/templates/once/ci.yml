@@ -1,0 +1,24 @@
+---
+name: CI
+
+on:
+  push:
+    branches: [dev]
+  pull_request:
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ci:
+    uses: cyr-ius/.github/.github/workflows/web-ci.yml@v1
+    with:
+      backend-dir: {{BACKEND_DIR}}
+      # pre-commit hooks (ruff, prettier, codespell...) on every file
+      backend-run: cd "$GITHUB_WORKSPACE" && uv run --project {{BACKEND_DIR}} prek run --all-files --show-diff-on-failure
