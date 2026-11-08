@@ -9,7 +9,8 @@
 # specific: they are only written when missing, with values detected from the
 # repository (image name, port, backend directory...), then edited by hand.
 # Release Please files (config, manifest, version.txt) are also only written
-# when missing. Expects a backend managed by uv and a frontend/ directory.
+# when missing, and Dependabot entries get `target-branch: "dev"` when none has
+# one. Expects a backend managed by uv and a frontend/ directory.
 set -euo pipefail
 
 TEMPLATES="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/templates"
@@ -25,7 +26,7 @@ LEGACY_WORKFLOWS=(
 )
 
 usage() {
-  sed -n '2,13s/^# \{0,1\}//p' "$0"
+  sed -n '2,14s/^# \{0,1\}//p' "$0"
   exit "${1:-0}"
 }
 
@@ -107,6 +108,11 @@ sync_repo() {
     if [[ $(basename "$f") == docs.yml && ! -f $repo/mkdocs.yml ]]; then continue; fi
     [[ -f $gh/workflows/$(basename "$f") ]] || render "$f" "$gh/workflows/$(basename "$f")"
   done
+
+  # Development happens on dev: Dependabot opens its pull requests there
+  if [[ -f $gh/dependabot.yml ]] && ! grep -qE '^ +target-branch:' "$gh/dependabot.yml"; then
+    sed -i '/^  - package-ecosystem:/a\    target-branch: "dev"' "$gh/dependabot.yml"
+  fi
 
   [[ -f $repo/release-please-config.json ]] ||
     render "$TEMPLATES/once/release-please-config.json" "$repo/release-please-config.json"
