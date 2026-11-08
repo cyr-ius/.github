@@ -2,11 +2,12 @@
 name: Stale
 
 # The caller must grant `issues: write` and `pull-requests: write`.
+# No workflow-level permissions: a caller that sets job-level permissions
+# leaves `contents: none`, and requesting more would invalidate the call.
 on:
   workflow_call:
 
-permissions:
-  contents: read
+permissions: {}
 
 jobs:
   stale:
