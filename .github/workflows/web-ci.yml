@@ -1,0 +1,89 @@
+---
+name: Web CI
+
+# Lint and test a web application: a Python backend managed by uv and a Node
+# frontend. The caller needs no extra permission (`contents: read`).
+on:
+  workflow_call:
+    inputs:
+      python-version:
+        description: Python version of the backend.
+        type: string
+        default: "3.14"
+      backend-dir:
+        description: Directory holding the backend's pyproject.toml and uv.lock ("" skips the backend).
+        type: string
+        default: "."
+      sync-args:
+        description: Arguments of `uv sync`.
+        type: string
+        default: --locked --all-extras --all-groups
+      backend-run:
+        description: Shell commands run in backend-dir after `uv sync`.
+        type: string
+        default: |
+          uv run ruff check --output-format=github .
+          uv run ruff format --check --diff .
+      node-version:
+        description: Node.js version of the frontend.
+        type: string
+        default: "24"
+      frontend-dir:
+        description: Directory holding the frontend's package-lock.json ("" skips the frontend).
+        type: string
+        default: frontend
+      frontend-run:
+        description: Shell commands run in frontend-dir after `npm ci`.
+        type: string
+        default: npm run build
+
+permissions: {}
+
+jobs:
+  backend:
+    if: inputs.backend-dir != ''
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: ${{ inputs.backend-dir }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          python-version: ${{ inputs.python-version }}
+          enable-cache: true
+          cache-dependency-glob: ${{ inputs.backend-dir }}/uv.lock
+      - name: Install dependencies
+        env:
+          SYNC_ARGS: ${{ inputs.sync-args }}
+        run: |
+          read -ra args <<< "$SYNC_ARGS"
+          uv sync "${args[@]}"
+      - name: Check
+        run: ${{ inputs.backend-run }}
+
+  frontend:
+    if: inputs.frontend-dir != ''
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: ${{ inputs.frontend-dir }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ inputs.node-version }}
+          cache: npm
+          cache-dependency-path: ${{ inputs.frontend-dir }}/package-lock.json
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Check
+        run: ${{ inputs.frontend-run }}
