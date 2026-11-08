@@ -96,9 +96,9 @@ jobs:
           PORT: ${{ inputs.smoke-port }}
           HEALTH_PATH: ${{ inputs.smoke-path }}
           SMOKE_ARGS: ${{ inputs.smoke-args }}
-        # SMOKE_ARGS is split into words on purpose
         run: |
-          docker run -d --name smoke-test -p "$PORT:$PORT" $SMOKE_ARGS smoke-test:latest
+          read -ra args <<< "$SMOKE_ARGS"
+          docker run -d --name smoke-test -p "$PORT:$PORT" "${args[@]}" smoke-test:latest
           for _ in $(seq 1 30); do
             if curl -fsS "http://localhost:$PORT$HEALTH_PATH"; then
               docker rm -f smoke-test > /dev/null

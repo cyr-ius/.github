@@ -60,8 +60,9 @@ jobs:
       - name: Install dependencies
         env:
           SYNC_ARGS: ${{ inputs.sync-args }}
-        # SYNC_ARGS is split into words on purpose
-        run: uv sync $SYNC_ARGS
+        run: |
+          read -ra args <<< "$SYNC_ARGS"
+          uv sync "${args[@]}"
       - name: Check
         run: ${{ inputs.backend-run }}
 

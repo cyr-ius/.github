@@ -54,8 +54,9 @@ jobs:
           TAG: ${{ needs.release-please.outputs.tag_name }}
           WORKFLOW: ${{ inputs.publish-workflow }}
           ARGS: ${{ inputs.publish-args }}
-        # ARGS is split into words on purpose
-        run: gh workflow run "$WORKFLOW" --repo "$GITHUB_REPOSITORY" --ref "$TAG" $ARGS
+        run: |
+          read -ra args <<< "$ARGS"
+          gh workflow run "$WORKFLOW" --repo "$GITHUB_REPOSITORY" --ref "$TAG" "${args[@]}"
 
   # Bring the release commit (CHANGELOG.md, versions) back to the development branch
   sync-dev:
