@@ -7,6 +7,11 @@ name: Release Please
 #
 # The caller must grant `contents: write`, `pull-requests: write` and
 # `actions: write`; each job below only gets what it needs.
+#
+# When the development branch requires status checks (needed by the Dependabot
+# auto-merge), the workflow token cannot push to it: pass `dev-sync-key`, the
+# private key of a deploy key with write access, and add the DeployKey bypass to
+# the ruleset of the development branch.
 on:
   workflow_call:
     inputs:
@@ -22,6 +27,10 @@ on:
         description: Branch receiving the release commit ("" disables it).
         type: string
         default: dev
+    secrets:
+      dev-sync-key:
+        description: SSH private key of a write deploy key, to push to a protected development branch.
+        required: false
 
 permissions: {}
 
@@ -70,6 +79,8 @@ jobs:
         with:
           ref: ${{ inputs.dev-branch }}
           fetch-depth: 0
+          # Empty: the workflow token, enough for an unprotected branch
+          ssh-key: ${{ secrets.dev-sync-key }}
       - name: Merge the release branch into ${{ inputs.dev-branch }}
         env:
           DEV_BRANCH: ${{ inputs.dev-branch }}
