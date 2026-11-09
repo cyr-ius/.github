@@ -2,6 +2,9 @@
 
 Shared GitHub configuration for cyr-ius repositories.
 
+To open a new repository (Home Assistant integration, PyPI library or web application),
+follow [docs/nouveau-depot.md](docs/nouveau-depot.md) (in French).
+
 - `FUNDING.yml`: default funding file for every repository.
 - `.github/workflows/`: reusable workflows. Home Assistant ones are prefixed `ha-`
   (GitHub does not support reusable workflows in sub-directories).
