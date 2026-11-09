@@ -75,10 +75,17 @@ Prenez un dépôt existant comme modèle, par exemple `hass-pure-spa`.
 /media/data/dotgithub/ha/sync.sh .
 ```
 
-Le script écrit les workflows (`lint`, `tests`, `validate`, `release`,
-`dependabot-automerge`, `stale`), `dependabot.yml` (écosystèmes détectés : actions, uv,
-pre-commit, devcontainer) et les modèles d'issue et de pull request quand le dépôt n'en a pas
-(`--force` les remplace). Commitez, puis poussez sur `main`.
+- **Réécrits à chaque synchronisation** : les workflows `lint.yml`, `tests.yml` (seulement si
+  le dépôt a un dossier `tests/`), `validate.yml`, `release.yml`, `dependabot-automerge.yml`,
+  `stale.yml`, et `dependabot.yml` (écosystèmes détectés : actions, uv, pre-commit,
+  devcontainer). Ne les modifiez pas dans le dépôt : changez le modèle dans `ha/templates/`.
+- **Écrits une seule fois, puis propres au projet** : les modèles d'issue
+  (`.github/ISSUE_TEMPLATE/`) et de pull request (`.github/PULL_REQUEST_TEMPLATE.md`), quand
+  le dépôt n'en a pas. `--force` les remplace par les modèles.
+- **Supprimés avec `--prune`** : les anciens workflows propres au dépôt (`hassfest.yaml`,
+  `pytest.yml`, `release.yaml`...), remplacés par les modèles.
+
+Commitez, puis poussez sur `main`.
 
 ### 3. Configurer le dépôt
 
@@ -158,9 +165,16 @@ une bibliothèque existante comme modèle, par exemple `aiosysbus`.
 /media/data/dotgithub/py/sync.sh .
 ```
 
-Le script écrit `lint.yml`, `tests.yml` (Python 3.14 et 3.15 par défaut, voir `py-tests.yml`),
-`python-publish.yml`, `dependabot-automerge.yml`, `stale.yml` et `dependabot.yml`. Commitez,
-puis poussez sur la branche par défaut.
+- **Réécrits à chaque synchronisation** : tous les fichiers du script, à savoir les workflows
+  `lint.yml`, `tests.yml` (seulement si le dépôt a un dossier `tests/` ; Python 3.14 et 3.15
+  par défaut, voir `py-tests.yml`), `python-publish.yml`, `dependabot-automerge.yml`,
+  `stale.yml`, et `dependabot.yml` (écosystèmes détectés : actions, uv ou pip, pre-commit). Ne
+  les modifiez pas dans le dépôt : changez le modèle dans `py/templates/`.
+- **Écrit une seule fois** : rien, la famille n'a pas de fichier propre au projet.
+- **Supprimés avec `--prune`** : les anciens workflows propres au dépôt, remplacés par les
+  modèles.
+
+Commitez, puis poussez sur la branche par défaut.
 
 `python-publish.yml` reste dans le dépôt au lieu d'appeler un workflow réutilisable : PyPI
 n'accepte pas le *trusted publishing* depuis un workflow réutilisable.
@@ -222,7 +236,10 @@ Renommez l'application : `name` dans `docker-compose.yml`, valeur par défaut d'
 - **Écrits une seule fois, puis propres au projet** : `ci.yml`, `docker.yml`, `docs.yml`,
   `publish.yml`, `release-please-config.json`, `.release-please-manifest.json` et
   `version.txt`.
-- **Dependabot** : chaque entrée reçoit `target-branch: "dev"`.
+- **Modifié sans être réécrit** : `dependabot.yml`, dont chaque entrée reçoit
+  `target-branch: "dev"` si le fichier n'a encore aucun `target-branch`.
+- **Supprimés avec `--prune`** : les anciens workflows propres au dépôt
+  (`create-release.yml`, `docker-publish.yml`, `lint.yml`...), remplacés par les modèles.
 
 Vérifiez ensuite :
 
