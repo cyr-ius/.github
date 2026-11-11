@@ -10,8 +10,7 @@ utilisent les workflows réutilisables de ce dépôt :
 | [Application web](#application-web) | `/media/data/web-projets` | `web-` | `web/sync.sh` |
 
 Les dépôts appellent les workflows par le tag `v1`
-(`uses: cyr-ius/.github/.github/workflows/<workflow>.yml@v1`). Les commandes ci-dessous
-supposent ce dépôt cloné dans `/media/data/dotgithub`, à jour (`git pull`).
+(`uses: cyr-ius/.github/.github/workflows/<workflow>.yml@v1`).
 
 ## Règles communes
 
