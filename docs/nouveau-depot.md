@@ -247,8 +247,7 @@ Le workflow construit les distributions, refuse un tag différent de la version 
 
 Une application FastAPI + Angular livrée en une image Docker, développée sur `dev` et publiée
 par Release Please. Le point de départ est le template
-[angular-fastapi-scaffold](https://github.com/cyr-ius/angular-fastapi-scaffold) (clone local :
-`/media/data/web-projets/__skeleton__`), dont `AGENTS.md` décrit le code et les règles de
+[angular-fastapi-scaffold](https://github.com/cyr-ius/angular-fastapi-scaffold), dont `AGENTS.md` décrit le code et les règles de
 développement.
 
 ### 1. Créer le dépôt depuis le template
