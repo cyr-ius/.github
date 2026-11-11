@@ -311,8 +311,42 @@ sinon, la publication échoue avec « Forbidden » et la release reste en brouil
 gh secret set DOCKERHUB_TOKEN --repo cyr-ius/<nom>
 ```
 
-**Ruleset `Protect`** sur la branche par défaut : le même que pour Home Assistant, avec les
-checks `ci / backend`, `ci / frontend` et `docker / image`.
+**Ruleset `Protect`** sur la branche par défaut, avec les checks `ci / backend`,
+`ci / frontend` et `docker / image` :
+
+```json
+{
+  "name": "Protect",
+  "target": "branch",
+  "enforcement": "active",
+  "conditions": { "ref_name": { "include": ["~DEFAULT_BRANCH"], "exclude": [] } },
+  "rules": [
+    { "type": "deletion" },
+    { "type": "non_fast_forward" },
+    {
+      "type": "pull_request",
+      "parameters": {
+        "required_approving_review_count": 0,
+        "dismiss_stale_reviews_on_push": false,
+        "require_code_owner_review": false,
+        "require_last_push_approval": false,
+        "required_review_thread_resolution": false
+      }
+    },
+    {
+      "type": "required_status_checks",
+      "parameters": {
+        "strict_required_status_checks_policy": false,
+        "required_status_checks": [
+          { "context": "ci / backend", "integration_id": 15368 },
+          { "context": "ci / frontend", "integration_id": 15368 },
+          { "context": "docker / image", "integration_id": 15368 }
+        ]
+      }
+    }
+  ]
+}
+```
 
 **Ruleset `dev`** : les mêmes checks, pour l'auto-merge Dependabot, sans obligation de pull
 request. Les administrateurs et les deploy keys passent outre, pour pousser directement et
