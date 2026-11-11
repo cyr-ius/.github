@@ -379,7 +379,14 @@ Ne poussez pas de tag de version à la main.
 
 Si la CI de la pull request de release échoue après une correction mergée sur la branche par
 défaut, Release Please ne la reconstruit que si son contenu change : utilisez « Update branch »
-sur la pull request pour relancer la CI.
+sur la pull request pour relancer la CI. En ligne de commande :
+
+```bash
+# Numéro de la pull request de release ouverte
+gh pr list --repo cyr-ius/<dépôt> --label "autorelease: pending"
+# Merge la branche par défaut dans la pull request, ce qui relance la CI
+gh pr update-branch <numéro> --repo cyr-ius/<dépôt>
+```
 
 ## Liste de contrôle
 
