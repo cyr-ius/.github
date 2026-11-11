@@ -388,6 +388,13 @@ gh pr list --repo cyr-ius/<dépôt> --label "autorelease: pending"
 gh pr update-branch <numéro> --repo cyr-ius/<dépôt>
 ```
 
+`gh pr update-branch` demande gh 2.53 ou plus récent. Avec une version plus ancienne, passez par
+l'API :
+
+```bash
+gh api -X PUT repos/cyr-ius/<dépôt>/pulls/<numéro>/update-branch
+```
+
 ## Liste de contrôle
 
 | Étape | Home Assistant | PyPI | Web |
