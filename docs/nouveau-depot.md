@@ -179,6 +179,48 @@ Commitez, puis poussez sur la branche par défaut.
 `python-publish.yml` reste dans le dépôt au lieu d'appeler un workflow réutilisable : PyPI
 n'accepte pas le *trusted publishing* depuis un workflow réutilisable.
 
+Une fois la CI passée une première fois, créez le **ruleset `Protect`** sur la branche par
+défaut (voir [Créer un ruleset](#créer-un-ruleset)). Il exige les checks des workflows
+installés : `lint / lint` et un `tests / pytest (<version>)` par version de Python testée.
+
+```json
+{
+  "name": "Protect",
+  "target": "branch",
+  "enforcement": "active",
+  "conditions": { "ref_name": { "include": ["~DEFAULT_BRANCH"], "exclude": [] } },
+  "rules": [
+    { "type": "deletion" },
+    { "type": "non_fast_forward" },
+    {
+      "type": "pull_request",
+      "parameters": {
+        "required_approving_review_count": 0,
+        "dismiss_stale_reviews_on_push": false,
+        "require_code_owner_review": false,
+        "require_last_push_approval": false,
+        "required_review_thread_resolution": false
+      }
+    },
+    {
+      "type": "required_status_checks",
+      "parameters": {
+        "strict_required_status_checks_policy": false,
+        "required_status_checks": [
+          { "context": "lint / lint", "integration_id": 15368 },
+          { "context": "tests / pytest (3.14)", "integration_id": 15368 },
+          { "context": "tests / pytest (3.15)", "integration_id": 15368 }
+        ]
+      }
+    }
+  ]
+}
+```
+
+- Sans dossier `tests/`, retirez les deux entrées `tests / pytest (...)`.
+- Si `tests.yml` passe d'autres versions (`python-versions`), mettez une entrée par version.
+- Le ruleset ne bloque pas le push du tag : il ne vise que la branche par défaut.
+
 ### 3. Configurer PyPI et le dépôt
 
 - **Environnement `release`** : Settings → Environments → New environment → `release`
@@ -189,9 +231,8 @@ n'accepte pas le *trusted publishing* depuis un workflow réutilisable.
   - propriétaire `cyr-ius`, dépôt `<nom>` ;
   - workflow `python-publish.yml` ;
   - environnement `release`.
-- **Ruleset `Protect`** sur la branche par défaut : le même que pour Home Assistant, avec les
-  checks `lint / lint`, `tests / pytest (3.14)` et `tests / pytest (3.15)` (une entrée par
-  version testée).
+- **Ruleset `Protect`** sur la branche par défaut : voir l'exemple à la fin de
+  [2. Installer la CI](#2-installer-la-ci-1).
 
 Aucun secret n'est nécessaire : PyPI fait confiance au token OIDC du workflow.
 
