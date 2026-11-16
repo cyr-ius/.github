@@ -1,9 +1,17 @@
 #!/usr/bin/env bash
 # Sync the web application CI templates into local repositories.
 #
-# Usage: web/sync.sh [--prune] <repo> [<repo>...]
+# Usage: web/sync.sh [--prune] [--commit|--pr|--merge] [--message=TEXT] <repo> [<repo>...]
 #
-#   --prune  remove the legacy workflow files replaced by the templates
+#   --prune          remove the legacy workflow files replaced by the templates
+#   --commit         sync into a clean worktree of the remote base branch and
+#                    commit there, on branch ci/sync-templates-<sha>
+#   --pr             also push the branch (SSH) and open a pull request
+#   --merge          also enable auto-merge (squash) on the pull request
+#   --message=TEXT   commit / pull request title
+#
+# With --commit, --pr or --merge the repository's checkout is left untouched
+# (see lib/publish.sh).
 #
 # templates/workflows/* are always (re)written. templates/once/* are project
 # specific: they are only written when missing, with values detected from the
@@ -14,6 +22,18 @@
 set -euo pipefail
 
 TEMPLATES="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/templates"
+# Pull requests (--pr) target dev, where development happens: the default
+# branch only receives releases.
+publish_base() {
+  local head
+  if git -C "$1" show-ref --quiet refs/remotes/origin/dev; then
+    echo dev
+  else
+    head=$(git -C "$1" symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null) || head=origin/master
+    echo "${head#origin/}"
+  fi
+}
+source "$(dirname "${BASH_SOURCE[0]}")/../lib/publish.sh"
 
 # Workflow files from the previous per-repository CI, replaced by the templates.
 LEGACY_WORKFLOWS=(
@@ -26,7 +46,7 @@ LEGACY_WORKFLOWS=(
 )
 
 usage() {
-  sed -n '2,14s/^# \{0,1\}//p' "$0"
+  sed -n '2,21s/^# \{0,1\}//p' "$0"
   exit "${1:-0}"
 }
 
@@ -36,11 +56,14 @@ for arg in "$@"; do
   case $arg in
     --prune) prune=true ;;
     -h | --help) usage ;;
+    --commit | --pr | --merge | --message=*) publish_option "$arg" ;;
     -*) echo "unknown option: $arg" >&2; usage 1 ;;
     *) repos+=("$arg") ;;
   esac
 done
 ((${#repos[@]})) || usage 1
+PUBLISH_ARGS=(web/sync.sh)
+$prune && PUBLISH_ARGS+=(--prune)
 
 # Escape a string for use as a sed replacement.
 sed_escape() {
@@ -127,6 +150,4 @@ sync_repo() {
   echo "synced $repo (image: $IMAGE, port: $PORT, backend: $BACKEND_DIR, branch: $BRANCH)"
 }
 
-for repo in "${repos[@]}"; do
-  sync_repo "$repo"
-done
+sync_all "${repos[@]}"

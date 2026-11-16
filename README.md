@@ -14,6 +14,15 @@ follow [docs/nouveau-depot.md](docs/nouveau-depot.md) (in French).
   Workflows prefixed `py-`; `gh-release.yml`, `dependabot-automerge.yml` and
   `stale.yml` are shared by every family.
 
+- `lib/publish.sh`: options shared by the three `sync.sh` scripts to publish the
+  sync instead of leaving it in the working tree. `--commit` syncs into a clean
+  worktree of the remote base branch (default branch; `dev` for `web/`) and
+  commits on `ci/sync-templates-<sha>`, `--pr` also pushes it over SSH and opens
+  a pull request, `--merge` also enables auto-merge (squash); `--message=TEXT`
+  sets the title. The repository's own checkout is never touched, and
+  repositories already up to date are skipped. Example:
+  `ha/sync.sh --merge hass-pdns hass-onkyo`.
+
 - `web/`: web application (uv backend + Node frontend + Docker image) templates
   and `web/sync.sh [--prune] <repo>...`. Workflows prefixed `web-`. Release
   model: development on `dev`, Release Please on the default branch, which
