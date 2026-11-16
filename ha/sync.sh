@@ -1,16 +1,25 @@
 #!/usr/bin/env bash
 # Sync the Home Assistant CI templates into local integration repositories.
 #
-# Usage: ha/sync.sh [--prune] [--force] <repo> [<repo>...]
+# Usage: ha/sync.sh [--prune] [--force] [--commit|--pr|--merge] [--message=TEXT] <repo> [<repo>...]
 #
-#   --prune  remove the legacy workflow files replaced by the templates
-#   --force  overwrite the repository's own issue / pull request templates
+#   --prune          remove the legacy workflow files replaced by the templates
+#   --force          overwrite the repository's own issue / pull request templates
+#   --commit         sync into a clean worktree of the remote base branch and
+#                    commit there, on branch ci/sync-templates-<sha>
+#   --pr             also push the branch (SSH) and open a pull request
+#   --merge          also enable auto-merge (squash) on the pull request
+#   --message=TEXT   commit / pull request title
+#
+# With --commit, --pr or --merge the repository's checkout is left untouched
+# (see lib/publish.sh).
 #
 # Workflows and dependabot.yml are always (re)written. Issue and pull request
 # templates are only written when the repository has none, unless --force.
 set -euo pipefail
 
 TEMPLATES="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/templates"
+source "$(dirname "${BASH_SOURCE[0]}")/../lib/publish.sh"
 
 # Workflow files from the previous per-repository CI, replaced by the templates.
 LEGACY_WORKFLOWS=(
@@ -27,7 +36,7 @@ LEGACY_WORKFLOWS=(
 )
 
 usage() {
-  sed -n '2,10s/^# \{0,1\}//p' "$0"
+  sed -n '2,18s/^# \{0,1\}//p' "$0"
   exit "${1:-0}"
 }
 
@@ -39,11 +48,15 @@ for arg in "$@"; do
     --prune) prune=true ;;
     --force) force=true ;;
     -h | --help) usage ;;
+    --commit | --pr | --merge | --message=*) publish_option "$arg" ;;
     -*) echo "unknown option: $arg" >&2; usage 1 ;;
     *) repos+=("$arg") ;;
   esac
 done
 ((${#repos[@]})) || usage 1
+PUBLISH_ARGS=(ha/sync.sh)
+$prune && PUBLISH_ARGS+=(--prune)
+$force && PUBLISH_ARGS+=(--force)
 
 # Escape a string for use as a sed replacement.
 sed_escape() {
@@ -116,6 +129,4 @@ sync_repo() {
   echo "synced $repo (domain: $DOMAIN, branch: $BRANCH)"
 }
 
-for repo in "${repos[@]}"; do
-  sync_repo "$repo"
-done
+sync_all "${repos[@]}"
